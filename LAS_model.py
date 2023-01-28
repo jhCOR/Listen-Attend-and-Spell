@@ -5,9 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 
-# from src.util import init_weights, init_gate
-# from src.module import VGGExtractor, CNNExtractor, RNNLayer, ScaleDotAttention, LocationAwareAttention
-
+from util import init_weights, init_gate
+from module import VGGExtractor, CNNExtractor, RNNLayer, ScaleDotAttention, LocationAwareAttention
 
 class ASR(nn.Module):
     ''' ASR model, including Encoder/Decoder(s)'''
