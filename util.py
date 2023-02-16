@@ -5,34 +5,51 @@ import torch
 import numpy as np
 from torch import nn
 
-def init_weights(module):
-    # Exceptions
-    if type(module) == nn.Embedding:
-        module.weight.data.normal_(0, 1)
+def label_to_string(labels, id2char):
+    """
+    Converts label to string (number => Hangeul)
+
+    Args:
+        labels (list): number label
+        id2char (dict): id2char[id] = ch
+        eos_id (int): identification of <end of sequence>
+
+    Returns: sentence
+        - **sentence** (str or list): Hangeul representation of labels
+    """
+    sos_id = char2id['<sos>']
+    eos_id = char2id['<eos>']
+    if len(labels.shape) == 1:
+        sentence = str()
+        for label in labels:
+            if label.item() == sos_id:
+                continue
+            if label.item() == eos_id:
+                break
+            sentence += id2char[label.item()]
+        return sentence
+
+    elif len(labels.shape) == 2:
+        sentences = list()
+        for batch in labels:
+            sentence = str()
+            for label in batch:
+                if label.item() == sos_id:
+                    continue
+                if label.item() == eos_id:
+                    break
+                sentence += id2char[label.item()]
+            sentences.append(sentence)
+        return sentences
+    
+def scheduler_sampling(epoch, e_min=1, ratio_s=0.9, ratio_e=0, n_epoch_ramp=10):
+    if epoch>e_min:
+        epoch -= e_min
+        teacher_forcing_ratio = max(ratio_s - (ratio_s-ratio_e)*epoch/n_epoch_ramp, ratio_e)
     else:
-        for p in module.parameters():
-            data = p.data
-            if data.dim() == 1:
-                # bias
-                data.zero_()
-            elif data.dim() == 2:
-                # linear weight
-                n = data.size(1)
-                stdv = 1. / math.sqrt(n)
-                data.normal_(0, stdv)
-            elif data.dim() in [3, 4]:
-                # conv weight
-                n = data.size(1)
-                for k in data.size()[2:]:
-                    n *= k
-                stdv = 1. / math.sqrt(n)
-                data.normal_(0, stdv)
-            else:
-                raise NotImplementedError
+        teacher_forcing_ratio = 0.9
+    return teacher_forcing_ratio
 
-
-def init_gate(bias):
-    n = bias.size(0)
-    start, end = n // 4, n // 2
-    bias.data[start:end].fill_(1.)
-    return bias
+def set_lr(optimizer, lr):
+        for g in optimizer.param_groups:
+            g['lr'] = lr

@@ -1,9 +1,8 @@
-from torch.utils.data import Dataset, DataLoader, random_split
 import torchaudio
-from torchaudio import transforms, functional
 import torch.nn.functional as F
-import random
-# from specaugment.spec_augment_pytorch import spec_augment
+from torch.utils.data import Dataset
+from .config import CFG
+import os
 
 class SpeechDataset(Dataset):
 
@@ -23,8 +22,10 @@ class SpeechDataset(Dataset):
         #     self.origin_data = list(self.pair_data)
         #     self.aug_ids = [id for id in range(len(self.pair_data), len(self.pair_data)*2)]
         #     self.pair_data.extend(self.pair_data)
+        
         self.mel_converter = torchaudio.transforms.MelSpectrogram(sample_rate=CFG.sr, n_fft=CFG.n_fft, hop_length=CFG.hop_length, n_mels=CFG.n_mels)
         self.db_converter = torchaudio.transforms.AmplitudeToDB()
+        
     def __len__(self):
         return len(self.dataset)
     
@@ -33,19 +34,27 @@ class SpeechDataset(Dataset):
             idx = idx.tolist()
 
         audio, sample_rate, label, _, _, _ = self.dataset[idx]
-
-        log_mel_spec = self.db_converter(self.mel_converter(audio))
+        #audio = self.trim(audio)
+        #x = self.log_scale(self.transform(audio)).unsqueeze(0)
+        """
+        spectrogram = torch.stft(
+            signal,
+            self.pkwargs['n_fft'],
+            hop_length=self.pkwargs['hop_length'],
+            win_length=self.pkwargs['n_fft'],
+            window=torch.hamming_window(self.n_fft),
+            center=False,
+            normalized=False,
+            onesided=True
+        )
+        """
+        #log_mel_spec = self.db_converter(self.mel_converter(audio))
         # print("audio.unsqueeze(0):", audio.unsqueeze(0).shape)
-        # x = torchaudio.compliance.kaldi.fbank(audio, num_mel_bins=80).t().unsqueeze(0)
+        x = torchaudio.compliance.kaldi.fbank(audio, num_mel_bins=CFG.n_mels).t().unsqueeze(0)
         # print("x shape:", x.shape)
         # (m, 80 + use_energy)
 
-        # if self.specaugment:
-        #     if idx in self.aug_ids:
-        #         x = spec_augment(x, time_warping_para=40, frequency_masking_para=13,
-        #                         time_masking_para=30, frequency_mask_num=2, time_mask_num=2)
-        
-        x = log_mel_spec
+        #x = log_mel_spec
         x = x[0,:,:].squeeze(1).t()
         if self.max_len:
             x = np.pad(x, ((0, 0), (0, self.max_len - x.shape[1])), "constant")
@@ -60,12 +69,6 @@ class SpeechDataset(Dataset):
         y.append(EOS_TOKEN)
         y = np.array(y)
         return (x, y)
-    
-    def shuffle(self):
-        random.shuffle(self.dataset)
-        # if self.specaugment:
-        #     self.aug_ids = [id for id in range(len(self.pair_data), len(self.pair_data)*2)]
-        #     self.pair_data.extend(self.pair_data)
             
     def trim(self, sig, hop_size=64, threshhold=0.002):
         head = None
